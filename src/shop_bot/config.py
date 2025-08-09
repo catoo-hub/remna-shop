@@ -3,10 +3,16 @@ import os
 server_name = os.getenv("SERVER_NAME")
 
 PLANS = {
-    "buy_1_month": (f"Подписка 1 месяц", "50.00", 1),
+    "buy_1_month": (f"Подписка 1 месяц", "1.00", 1),
     "buy_3_months": (f"Подписка 3 месяца", "135.00", 3),
     "buy_6_months": (f"Подписка 6 месяцев", "240.00", 6),
     "buy_12_months": (f"Подписка 12 месяцев", "450.00", 12),
+}
+
+# Дополнительные пакеты трафика (id: (Название, Цена, ГБ))
+TRAFFIC_PACKS = {
+    "traffic_100_gb": ("Доп. трафик +100 ГБ", "100.00", 100),
+    "traffic_300_gb": ("Доп. трафик +300 ГБ", "250.00", 300),
 }
 
 WELCOME_MESSAGE = "Здесь вы можете приобрести быстрый и надежный VPN."
@@ -58,3 +64,7 @@ def get_purchase_success_text(action: str, key_number: int, expiry_date, connect
         f"⏳ <b>Он будет действовать до:</b> {expiry_formatted}\n\n"
         f"<code>{connection_string}</code>"
     )
+
+def build_progress_bar(percent: float, width: int = 20) -> str:
+    filled = int(width * percent / 100)
+    return '▰' * filled + '▱' * (width - filled)

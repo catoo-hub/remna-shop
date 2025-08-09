@@ -1,15 +1,16 @@
 [project]
-name = "3x-ui-shop"
-version = "1.0.2"
-description = "Бот для автоматической продажи VLESS VPN из панели 3x-ui"
+name = "remna-shop"
+version = "1.0.0"
+description = "Бот для автоматической продажи VLESS VPN из панели Remnawave"
 dependencies = [
     "aiogram==3.21.0",
     "flask==3.1.1",
-    "py3xui==0.4.0",
     "pyotp==2.9.0",
     "python-dotenv==1.1.1",
     "qrcode[pil]==8.2",
     "yookassa==3.5.0",
+    "aiohttp==3.10.5",
+    "cryptography==43.0.1",
 ]
 
 [project.optional-dependencies]

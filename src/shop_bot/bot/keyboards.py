@@ -11,13 +11,17 @@ main_reply_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-def create_main_menu_keyboard(user_keys: list, trial_available: bool, is_admin: bool) -> InlineKeyboardMarkup:
+def create_main_menu_keyboard(user_keys: list, trial_available: bool, is_admin: bool, auto_renew: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     
     if trial_available:
         builder.button(text="🎁 Попробовать бесплатно (3 дня)", callback_data="get_trial")
 
     builder.button(text="👤 Мой профиль", callback_data="show_profile")
+    builder.button(text="📊 Трафик", callback_data="show_traffic")
+    builder.button(text="🎟 Промокод", callback_data="enter_promo")
+    builder.button(text="👥 Рефералы", callback_data="show_referrals")
+    builder.button(text=f"🔁 Автопродление: {'ON' if auto_renew else 'OFF'}", callback_data="toggle_autorenew")
     builder.button(text=f"🔑 Мои ключи ({len(user_keys)})", callback_data="manage_keys")
 
     builder.button(text="🆘 Поддержка", callback_data="show_help")
@@ -27,7 +31,7 @@ def create_main_menu_keyboard(user_keys: list, trial_available: bool, is_admin: 
     if is_admin:
         builder.button(text="⚙️ Админ-панель", callback_data="open_admin_panel")
 
-    layout = [1 if trial_available else 0, 2, 1, 1, 1 if is_admin else 0]
+    layout = [1 if trial_available else 0, 4, 2, 1, 1, 1 if is_admin else 0]
     actual_layout = [size for size in layout if size > 0]
     builder.adjust(*actual_layout)
     
@@ -40,6 +44,8 @@ def create_admin_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="🔒 Изменить ссылку 'Политика'", callback_data="admin_edit_privacy")
     builder.button(text="🆘 Изменить ссылку 'Поддержка'", callback_data="admin_edit_support_user")
     builder.button(text="🆘 Изменить текст 'Поддержка'", callback_data="admin_edit_support_text")
+    builder.button(text="🎟 Промокоды", callback_data="admin_promos")
+    builder.button(text="📈 Статистика", callback_data="admin_stats")
     builder.button(text="⬅️ Выйти из админ. режима", callback_data="back_to_main_menu")
     builder.adjust(1)
     return builder.as_markup()
@@ -89,6 +95,9 @@ def create_plans_keyboard(plans: dict, action: str, key_id: int = 0) -> InlineKe
 
 def create_payment_method_keyboard(payment_methods: dict, plan_id: str, action: str, key_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    if payment_methods.get("stars"):
+        callback_data = f"pay_stars_{plan_id}_{action}_{key_id}"
+        builder.button(text="⭐ Telegram Stars", callback_data=callback_data)
     if payment_methods.get("yookassa"):
         if os.getenv("SBP_ENABLED") == "true".lower():
             callback_data = f"pay_yookassa_{plan_id}_{action}_{key_id}"
@@ -131,6 +140,7 @@ def create_key_info_keyboard(key_id: int) -> InlineKeyboardMarkup:
     builder.button(text="➕ Продлить этот ключ", callback_data=f"extend_key_{key_id}")
     builder.button(text="📱 Показать QR-код", callback_data=f"show_qr_{key_id}")
     builder.button(text="📖 Инструкция", callback_data=f"show_instruction_{key_id}")
+    builder.button(text="➕ Доп. трафик", callback_data=f"traffic_packs_{key_id}")
     builder.button(text="⬅️ Назад к списку ключей", callback_data="manage_keys")
     builder.adjust(1)
     return builder.as_markup()
@@ -145,7 +155,51 @@ def create_back_to_menu_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="⬅️ Назад в меню", callback_data="back_to_main_menu")
     return builder.as_markup()
 
+def create_traffic_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔄 Обновить", callback_data="refresh_traffic")
+    builder.button(text="⬅️ Назад в меню", callback_data="back_to_main_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
 def create_agreement_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="✅ Принимаю", callback_data="agree_to_terms")
+    return builder.as_markup()
+
+def create_traffic_packs_keyboard(packs: dict, key_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for pack_id, (title, price, gb) in packs.items():
+        builder.button(text=f"{title} - {price} RUB", callback_data=f"buy_pack_{pack_id}_{key_id}")
+    builder.button(text="⬅️ Назад к ключу", callback_data=f"show_key_{key_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+def create_promo_enter_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✍️ Ввести промокод", callback_data="enter_promo_start")
+    builder.button(text="⬅️ Назад в меню", callback_data="back_to_main_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+def create_autorenew_toggle_keyboard(enabled: bool) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"🔁 Автопродление: {'ON' if enabled else 'OFF'}", callback_data="toggle_autorenew_confirm")
+    builder.button(text="⬅️ Назад в меню", callback_data="back_to_main_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+def create_admin_promos_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="➕ Создать промокод", callback_data="admin_promo_create")
+    builder.button(text="📋 Список промокодов", callback_data="admin_promo_list")
+    builder.button(text="⬅️ Назад", callback_data="open_admin_panel")
+    builder.adjust(1)
+    return builder.as_markup()
+
+def create_admin_promo_toggle_keyboard(code: str, active: bool) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=("🔴 Выключить" if active else "🟢 Включить"), callback_data=f"admin_promo_toggle_{code}")
+    builder.button(text="⬅️ Назад", callback_data="admin_promos")
+    builder.adjust(1)
     return builder.as_markup()

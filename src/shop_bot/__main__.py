@@ -14,7 +14,7 @@ from shop_bot.bot import admin_handlers
 from shop_bot.bot import handlers
 from shop_bot.webhook_server.app import create_webhook_app
 from shop_bot.config import PLANS
-from shop_bot.data_manager.scheduler import periodic_subscription_check
+from shop_bot.data_manager.scheduler import start_subscription_monitor
 from shop_bot.data_manager import database
 
 def main():
@@ -40,15 +40,22 @@ def main():
     yookassa_enabled = bool(yookassa_shop_id and yookassa_shop_id.strip() and yookassa_secret_key and yookassa_secret_key.strip())
     crypto_enabled = bool(crypto_api_key and crypto_api_key.strip() and crypto_merchant_id and crypto_merchant_id.strip())
     crypto_bot_enabled = bool(crypto_bot_api and crypto_bot_api.strip())
+    stars_enabled = bool(os.getenv("STARS_ENABLED", "true").lower() == "true")  # По умолчанию включен
 
     if not TELEGRAM_TOKEN or not TELEGRAM_BOT_USERNAME:
         raise ValueError("Необходимо установить TELEGRAM_BOT_TOKEN и TELEGRAM_BOT_USERNAME")
 
     payment_methods = {
+        "stars": stars_enabled,
         "yookassa": yookassa_enabled,
         "crypto": crypto_enabled,
         "crypto_bot": crypto_bot_enabled
     }
+
+    if payment_methods["stars"]:
+        logger.info("Telegram Stars payment method is ENABLED.")
+    else:
+        logger.warning("Telegram Stars payment method is DISABLED.")
 
     if payment_methods["yookassa"]:
         Configuration.account_id = yookassa_shop_id
@@ -67,7 +74,7 @@ def main():
     else:
         logger.warning("Crypto bot payment method is DISABLED (CRYPTO_BOT_API is missing in .env).")
 
-    if not payment_methods["yookassa"] and not payment_methods["crypto"] and not payment_methods["crypto_bot"]:
+    if not any(payment_methods.values()):
         logger.critical("!!! NO PAYMENT SYSTEMS CONFIGURED! Bot cannot accept payments. !!!")
         return
     
@@ -88,7 +95,7 @@ def main():
     async def start_all():
         loop = asyncio.get_running_loop()
         flask_app.config['EVENT_LOOP'] = loop
-        
+
         flask_thread = threading.Thread(
             target=lambda: flask_app.run(host='0.0.0.0', port=1488, use_reloader=False),
             daemon=True
@@ -97,7 +104,7 @@ def main():
         logger.info("Flask server started on port 1488.")
 
         if database.get_all_vpn_users():
-             asyncio.create_task(periodic_subscription_check())
+            asyncio.create_task(start_subscription_monitor(bot))
 
         logger.info("Aiogram Bot polling started...")
         await dp.start_polling(bot)
