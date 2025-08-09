@@ -209,7 +209,7 @@ async def start_subscription_monitor(bot: Bot):
                 # Очистка старых бэкапов (оставляем только файлы, не tar.gz)
                 backups_dir = Path(database.DB_FILE.parent) / 'backups'
                 if backups_dir.exists():
-                    files = sorted(backups_dir.glob('users_*.db'))
+                    files = sorted(backups_dir.glob('shop_bot_*.db'))
                     if len(files) > 20:
                         cleaned_count = 0
                         for old in files[:-20]:

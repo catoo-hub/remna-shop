@@ -7,8 +7,11 @@ from shop_bot.config import ABOUT_TEXT, TERMS_URL, PRIVACY_URL, SUPPORT_USER, SU
 
 logger = logging.getLogger(__name__)
 
+# Для продакшена база должна быть в директории data
 PROJECT_ROOT = Path.cwd()
-DB_FILE = PROJECT_ROOT / "users.db"
+DATA_DIR = PROJECT_ROOT / "data"
+DATA_DIR.mkdir(exist_ok=True)  # Создаем директорию если не существует
+DB_FILE = DATA_DIR / "shop_bot.db"
 
 def initialize_db():
     try:
