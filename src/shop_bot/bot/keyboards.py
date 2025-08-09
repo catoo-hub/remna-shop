@@ -46,6 +46,7 @@ def create_admin_keyboard() -> InlineKeyboardMarkup:
     builder.button(text="🆘 Изменить текст 'Поддержка'", callback_data="admin_edit_support_text")
     builder.button(text="🎟 Промокоды", callback_data="admin_promos")
     builder.button(text="📈 Статистика", callback_data="admin_stats")
+    builder.button(text="💾 Создать бэкап", callback_data="admin_backup")
     builder.button(text="⬅️ Выйти из админ. режима", callback_data="back_to_main_menu")
     builder.adjust(1)
     return builder.as_markup()

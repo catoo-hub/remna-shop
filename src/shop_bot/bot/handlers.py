@@ -8,6 +8,9 @@ import aiohttp
 import os
 import hashlib
 import json
+import tarfile
+import shutil
+from pathlib import Path
 
 from aiogram import Bot, Router, F, types, html
 from aiogram.filters import Command
@@ -41,6 +44,94 @@ PLANS = None
 ADMIN_ID = os.getenv("ADMIN_TELEGRAM_ID")
 
 logger = logging.getLogger(__name__)
+
+# Импорт красивого логгера
+from shop_bot.utils.logger import bot_logger
+
+async def create_backup_and_send(bot: Bot, admin_id: str, is_auto: bool = False) -> bool:
+    """Создает бэкап базы данных и отправляет админу.
+    
+    Args:
+        bot: Экземпляр бота
+        admin_id: ID админа для отправки
+        is_auto: True если автоматический бэкап, False если ручной
+        
+    Returns:
+        bool: True если бэкап создан успешно, False в случае ошибки
+    """
+    backup_type = "🤖 Automatic" if is_auto else "📦 Manual"
+    logger.info(f"🎯 Starting {backup_type.lower()} backup process...")
+    
+    try:
+        # Получаем путь к базе данных
+        from shop_bot.data_manager.database import DB_FILE, set_last_backup_timestamp
+        db_path = Path(DB_FILE)
+        
+        # Создаем папку для бэкапов
+        backups_dir = db_path.parent / 'backups'
+        backups_dir.mkdir(exist_ok=True)
+        bot_logger.backup("CREATE_DIR", f"Backup directory: {backups_dir}")
+        
+        # Генерируем имя файла бэкапа
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        backup_name = f"backup_part_aa"
+        
+        # Создаем tar.gz архив
+        backup_file = backups_dir / f"{backup_name}.tar.gz"
+        bot_logger.backup("CREATE_ARCHIVE", f"Creating: {backup_file.name}")
+        
+        with tarfile.open(backup_file, "w:gz") as tar:
+            tar.add(db_path, arcname=db_path.name)
+        
+        # Получаем информацию о файле
+        file_size = backup_file.stat().st_size
+        # Исправляем расчет размера - если меньше 1 МБ, показываем в КБ
+        if file_size >= 1024 * 1024:
+            file_size_str = f"{file_size / (1024 * 1024):.1f} MB"
+        else:
+            file_size_str = f"{file_size / 1024:.1f} KB"
+        
+        # Получаем реальный IP сервера
+        server_ip = "45.144.53.239"  # Можно вынести в env переменную
+        
+        # Обновляем timestamp последнего бэкапа (используем UTC)
+        set_last_backup_timestamp(datetime.utcnow().isoformat())
+        bot_logger.backup("UPDATE_TIMESTAMP", "Last backup timestamp updated")
+        
+        # Создаем красивое сообщение как в Marzban
+        backup_type_text = "🤖 Auto Backup" if is_auto else "📦 Manual Backup"
+        backup_text = (
+            f"💾 <b>Backup Information</b>\n\n"
+            f"🔧 <b>Type:</b> <code>{backup_type_text}</code>\n"
+            f"🌐 <b>Server IP:</b> <code>{server_ip}</code>\n"
+            f"📁 <b>Backup File:</b> <code>{backup_name}.tar.gz</code>\n"
+            f"📅 <b>Backup Time:</b> <code>{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC</code>\n"
+            f"📊 <b>File Size:</b> <code>{file_size_str}</code>"
+        )
+        
+        # Отправляем файл админу
+        bot_logger.backup("SEND_TO_ADMIN", f"Sending backup ({file_size_str})")
+        try:
+            with open(backup_file, 'rb') as f:
+                backup_document = BufferedInputFile(f.read(), filename=f"{backup_name}.tar.gz")
+                
+            await bot.send_document(
+                chat_id=admin_id,
+                document=backup_document,
+                caption=backup_text
+            )
+            
+            bot_logger.backup("SUCCESS", f"Backup sent: {backup_file.name} ({file_size_str})", "OK")
+            return True
+            
+        except Exception as e:
+            bot_logger.backup("SEND_FAILED", f"Failed to send: {e}", "ERROR")
+            return False
+        
+    except Exception as e:
+        bot_logger.backup("CRITICAL_ERROR", f"Backup creation failed: {e}", "ERROR")
+        return False
+
 admin_router = Router()
 user_router = Router()
 
@@ -446,17 +537,76 @@ async def admin_stats_handler(callback: types.CallbackQuery):
     from shop_bot.data_manager.database import get_admin_stats, get_last_backup_timestamp
     stats = get_admin_stats()
     last_backup = get_last_backup_timestamp() or '—'
+    
+    # Красивое форматирование статистики
+    users_count = stats.get('users_count', 0)
+    active_keys = stats.get('active_keys', 0)
+    total_keys = stats.get('total_keys', 0)
+    total_months = stats.get('total_months', 0)
+    total_spent = stats.get('total_spent', 0)
+    active_promos = stats.get('active_promos', 0)
+    total_referrals = stats.get('total_referrals', 0)
+    
+    # Процент активных ключей
+    keys_percentage = round((active_keys / total_keys * 100) if total_keys > 0 else 0, 1)
+    
     text = (
-        "<b>📈 Статистика</b>\n" \
-        f"Пользователей: {stats.get('users_count',0)}\n" \
-        f"Активных ключей: {stats.get('active_keys',0)}/{stats.get('total_keys',0)}\n" \
-        f"Всего месяцев куплено: {stats.get('total_months',0)}\n" \
-        f"Сумма продаж: {stats.get('total_spent',0):.2f} RUB\n" \
-        f"Активных промокодов: {stats.get('active_promos',0)}\n" \
-        f"Рефералов всего: {stats.get('total_referrals',0)}\n" \
-        f"Последний бэкап: {last_backup}"
+        "📊 <b>СТАТИСТИКА БОТА</b>\n"
+        "═══════════════════════\n\n"
+        
+        "👥 <b>ПОЛЬЗОВАТЕЛИ</b>\n"
+        f"├ Всего пользователей: <code>{users_count:,}</code>\n"
+        f"└ Рефералов привлечено: <code>{total_referrals:,}</code>\n\n"
+        
+        "🔑 <b>VPN КЛЮЧИ</b>\n"
+        f"├ Активных: <code>{active_keys:,}</code> / <code>{total_keys:,}</code>\n"
+        f"├ Процент активности: <code>{keys_percentage}%</code>\n"
+        f"└ {'🟢' if keys_percentage > 50 else '🟡' if keys_percentage > 25 else '🔴'} "
+        f"{'Отлично' if keys_percentage > 50 else 'Нормально' if keys_percentage > 25 else 'Требует внимания'}\n\n"
+        
+        "💰 <b>ПРОДАЖИ</b>\n"
+        f"├ Общая выручка: <code>{total_spent:,.2f} RUB</code>\n"
+        f"├ Продано месяцев: <code>{total_months:,}</code>\n"
+        f"└ Средний чек: <code>{(total_spent/users_count if users_count > 0 else 0):,.2f} RUB</code>\n\n"
+        
+        "🎫 <b>ПРОМОКОДЫ</b>\n"
+        f"└ Активных: <code>{active_promos:,}</code>\n\n"
+        
+        "💾 <b>СИСТЕМА</b>\n"
+        f"└ Последний бэкап: <code>{last_backup}</code>\n\n"
+        
+        "═══════════════════════\n"
+        f"📅 Обновлено: <code>{datetime.now().strftime('%d.%m.%Y %H:%M')}</code>"
     )
     await callback.message.edit_text(text, reply_markup=keyboards.create_admin_keyboard())
+
+@user_router.callback_query(F.data == "admin_backup")
+async def admin_backup_handler(callback: types.CallbackQuery):
+    if str(callback.from_user.id) != ADMIN_ID:
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    
+    await callback.answer("Создаю бэкап...")
+    
+    # Изменяем сообщение, чтобы показать прогресс
+    try:
+        await callback.message.edit_text("⏳ Создание бэкапа...", reply_markup=None)
+    except Exception:
+        pass  # Игнорируем ошибки редактирования
+    
+    # Используем универсальную функцию для создания бэкапа
+    success = await create_backup_and_send(callback.bot, ADMIN_ID, is_auto=False)
+    
+    if success:
+        final_text = "✅ Бэкап успешно создан и отправлен!"
+    else:
+        final_text = "❌ Ошибка создания бэкапа. Проверьте логи."
+    
+    try:
+        await callback.message.edit_text(final_text, reply_markup=keyboards.create_admin_keyboard())
+    except Exception:
+        # Если не удается отредактировать, отправляем новое сообщение
+        await callback.message.answer(final_text, reply_markup=keyboards.create_admin_keyboard())
 
 @user_router.callback_query(F.data == "admin_promos")
 async def admin_promos_menu(callback: types.CallbackQuery):
@@ -952,11 +1102,10 @@ async def successful_payment_handler(message: types.Message, bot: Bot):
     payment = message.successful_payment
     
     try:
-        logger.info(f"Received stars payment: {payment.total_amount} stars from user {message.from_user.id}")
-        logger.info(f"Payment payload: {payment.invoice_payload}")
+        user_id = message.from_user.id
+        bot_logger.payment(user_id, "TELEGRAM_STARS", payment.total_amount, "RECEIVED")
         
         payload_data = json.loads(payment.invoice_payload)
-        logger.info(f"Parsed payload: {payload_data}")
         
         # Конвертируем сокращенные ключи обратно в полные для совместимости с process_successful_payment
         metadata = {
@@ -973,8 +1122,9 @@ async def successful_payment_handler(message: types.Message, bot: Bot):
         
         logger.info(f"Converted metadata: {metadata}")
         await process_successful_payment(bot, metadata)
-        logger.info(f"Successfully processed stars payment for user {message.from_user.id}")
+        bot_logger.payment(user_id, "TELEGRAM_STARS", payment.total_amount, "SUCCESS")
     except Exception as e:
+        bot_logger.payment(message.from_user.id, "TELEGRAM_STARS", payment.total_amount, "FAILED")
         logger.error(f"Error processing stars payment: {e}", exc_info=True)
         await message.answer("❌ Ошибка при обработке платежа. Обратитесь в поддержку.")
 
@@ -985,6 +1135,8 @@ async def process_successful_payment(bot: Bot, metadata: dict):
     plan_id_meta = metadata.get('plan_id')
     chat_id_to_delete = metadata.get('chat_id')
     message_id_to_delete = metadata.get('message_id')
+    
+    bot_logger.user_action(user_id, "PAYMENT_PROCESSING", f"{action} {months}m {price}₽")
     
     if chat_id_to_delete and message_id_to_delete:
         try:

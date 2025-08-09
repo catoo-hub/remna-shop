@@ -16,16 +16,20 @@ from shop_bot.webhook_server.app import create_webhook_app
 from shop_bot.config import PLANS
 from shop_bot.data_manager.scheduler import start_subscription_monitor
 from shop_bot.data_manager import database
+from shop_bot.utils.logger import bot_logger
 
 def main():
     load_dotenv()
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - [%(levelname)s] - %(name)s - (%(filename)s).%(funcName)s(%(lineno)d) - %(message)s"
-    )
-    logger = logging.getLogger(__name__)
+    
+    # Отключаем стандартные логи для чистоты
+    logging.getLogger('aiogram').setLevel(logging.WARNING)
+    logging.getLogger('aiohttp').setLevel(logging.WARNING)
+    logging.getLogger('werkzeug').setLevel(logging.WARNING)
+    
+    bot_logger.startup("Initializing Remna Shop Bot...")
 
     database.initialize_db()
+    bot_logger.system("DATABASE", "SQLite database initialized", "OK")
 
     TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
     TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME")
@@ -53,29 +57,30 @@ def main():
     }
 
     if payment_methods["stars"]:
-        logger.info("Telegram Stars payment method is ENABLED.")
+        bot_logger.system("PAYMENTS", "Telegram Stars payment enabled", "OK")
     else:
-        logger.warning("Telegram Stars payment method is DISABLED.")
+        bot_logger.system("PAYMENTS", "Telegram Stars payment disabled", "WARNING")
 
     if payment_methods["yookassa"]:
         Configuration.account_id = yookassa_shop_id
         Configuration.secret_key = yookassa_secret_key
-        logger.info("YooKassa payment method is ENABLED.")
+        bot_logger.system("PAYMENTS", "YooKassa payment enabled", "OK")
     else:
-        logger.warning("YooKassa payment method is DISABLED (YOOKASSA_SHOP_ID or YOOKASSA_SECRET_KEY is missing in .env).")
+        bot_logger.system("PAYMENTS", "YooKassa payment disabled (credentials missing)", "WARNING")
 
     if payment_methods["crypto"]:
-        logger.info("Crypto payment method is ENABLED.")
+        bot_logger.system("PAYMENTS", "Crypto payment enabled", "OK")
     else:
-        logger.warning("Crypto payment method is DISABLED (CRYPTO_API_KEY is missing in .env).")
+        bot_logger.system("PAYMENTS", "Crypto payment disabled (API key missing)", "WARNING")
 
     if payment_methods["crypto_bot"]:
-        logger.info("Crypto bot payment method is ENABLED.")
+        bot_logger.system("PAYMENTS", "Crypto bot payment enabled", "OK")
     else:
-        logger.warning("Crypto bot payment method is DISABLED (CRYPTO_BOT_API is missing in .env).")
+        bot_logger.system("PAYMENTS", "Crypto bot payment disabled (API missing)", "WARNING")
 
     if not any(payment_methods.values()):
-        logger.critical("!!! NO PAYMENT SYSTEMS CONFIGURED! Bot cannot accept payments. !!!")
+        bot_logger.system("PAYMENTS", "NO PAYMENT SYSTEMS CONFIGURED!", "ERROR")
+        bot_logger.critical("Bot cannot accept payments - shutting down")
         return
     
     handlers.PLANS = PLANS
@@ -101,18 +106,19 @@ def main():
             daemon=True
         )
         flask_thread.start()
-        logger.info("Flask server started on port 1488.")
+        bot_logger.system("WEBHOOK", "Flask server started on port 1488", "OK")
 
         if database.get_all_vpn_users():
             asyncio.create_task(start_subscription_monitor(bot))
 
-        logger.info("Aiogram Bot polling started...")
+        bot_logger.system("TELEGRAM", "Bot polling started", "OK")
         await dp.start_polling(bot)
 
     try:
         asyncio.run(start_all())
     except (KeyboardInterrupt, SystemExit):
-        logger.info("Bot stopped.")
+        bot_logger.shutdown()
+        bot_logger.info("Bot stopped gracefully")
 
 if __name__ == "__main__":
     main()

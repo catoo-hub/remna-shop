@@ -1,10 +1,21 @@
+version: "3.8"
+
 services:
-  bot:
+  remna-shop-bot:
     build: .
+    container_name: remna-shop-bot
     restart: unless-stopped
     env_file:
       - .env
     ports:
-      - '1488:1488'
+      - "1488:1488"
     volumes:
-      - .:/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+    networks:
+      - remna-network
+
+networks:
+  remna-network:
+    driver: bridge
