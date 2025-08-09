@@ -19,6 +19,29 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
+# Универсальная функция для безопасного редактирования сообщений
+async def safe_edit_message(message: types.Message, text: str, reply_markup=None):
+    """
+    Безопасно редактирует сообщение, обрабатывая ошибки Telegram
+    """
+    try:
+        await message.edit_text(text, reply_markup=reply_markup)
+    except TelegramBadRequest as e:
+        if "message is not modified" in str(e):
+            # Добавляем невидимый символ для принудительного обновления
+            modified_text = text + "‎"  # Добавляем невидимый символ
+            try:
+                await message.edit_text(modified_text, reply_markup=reply_markup)
+            except:
+                # Если всё равно не получается, отправляем новое сообщение
+                await message.answer(text, reply_markup=reply_markup)
+        else:
+            # Для других ошибок отправляем новое сообщение
+            await message.answer(text, reply_markup=reply_markup)
+    except Exception:
+        # Для любых других ошибок отправляем новое сообщение
+        await message.answer(text, reply_markup=reply_markup)
+
 from shop_bot.bot import keyboards
 from shop_bot.modules import remnawave_api
 from shop_bot.data_manager.database import (
@@ -363,12 +386,19 @@ async def traffic_status_handler(callback: types.CallbackQuery):
             expiry_date = datetime.fromisoformat(key['expiry_date'])
             status = "✅" if expiry_date > datetime.now() else "❌"
             lines.append(f"{status} Ключ #{idx}: до {expiry_date.strftime('%d.%m.%Y')}")
-            
-    lines.append("\nНажмите 'Обновить' для актуализации.")
-    await callback.message.edit_text("\n".join(lines), reply_markup=keyboards.create_traffic_keyboard())
+    
+    # Добавляем timestamp для уникальности сообщения
+    from datetime import datetime
+    current_time = datetime.now().strftime("%H:%M:%S")
+    lines.append(f"\nОбновлено: {current_time}")
+    lines.append("Нажмите 'Обновить' для актуализации.")
+    
+    await safe_edit_message(callback.message, "\n".join(lines), keyboards.create_traffic_keyboard())
 
 @user_router.callback_query(F.data == "refresh_traffic")
 async def refresh_traffic_handler(callback: types.CallbackQuery):
+    await callback.answer("🔄 Обновляю данные...")
+    # Просто вызываем обновление данных
     await traffic_status_handler(callback)
 
 @user_router.callback_query(F.data == "show_help")
