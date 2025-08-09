@@ -20,7 +20,7 @@
 **Linux:**
 
 ```bash
-git clone <your-repo-url> /opt/remna-shop
+git clone https://github.com/catoo-hub/remna-shop /opt/remna-shop
 cd /opt/remna-shop
 chmod +x deploy.sh
 sudo ./deploy.sh
@@ -29,7 +29,7 @@ sudo ./deploy.sh
 **Windows:**
 
 ```powershell
-git clone <your-repo-url> C:\remna-shop
+git clone https://github.com/catoo-hub/remna-shop C:\remna-shop
 cd C:\remna-shop
 .\deploy.bat
 ```
@@ -39,7 +39,7 @@ cd C:\remna-shop
 1. **Клонируйте репозиторий**
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/catoo-hub/remna-shop
 cd remna-shop
 ```
 
