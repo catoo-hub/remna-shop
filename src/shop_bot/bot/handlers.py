@@ -481,7 +481,7 @@ async def trial_period_handler(callback: types.CallbackQuery):
     await callback.message.edit_text("Отлично! Создаю для вас бесплатный ключ на 3 дня...")
     try:
         key_number = get_next_key_number(user_id)
-        email = f"user{user_id}-key{key_number}-trial@telegram.bot"
+        email = f"user{user_id}-key{key_number}-trial@kitsura_bot"
         uri, expire_iso, vless_uuid = await remnawave_api.provision_key(email, days=3, telegram_id=str(user_id))
         if not uri or not expire_iso or not vless_uuid:
             # Сбрасываем флаг при ошибке создания ключа
@@ -1069,6 +1069,7 @@ async def create_stars_payment_handler(callback: types.CallbackQuery, state: FSM
             title=f"VPN подписка - {name}",
             description=description,
             payload=json.dumps(payload_data, separators=(',', ':')),  # без пробелов
+            provider_token="",  # Для Telegram Stars токен должен быть пустым
             currency="XTR",  # Telegram Stars currency
             prices=[LabeledPrice(label=name, amount=stars_amount)]
         )
@@ -1176,7 +1177,7 @@ async def process_successful_payment(bot: Bot, metadata: dict):
         key_number = 0
         if action == "new":
             key_number = get_next_key_number(user_id)
-            email = f"user{user_id}-key{key_number}@kitsurasub_bot"
+            email = f"user{user_id}-key{key_number}@kitsura_bot"
         elif action == "extend":
             key_data = get_key_by_id(key_id)
             if not key_data or key_data['user_id'] != user_id:

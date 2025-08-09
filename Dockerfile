@@ -17,7 +17,7 @@ COPY . .
 RUN mkdir -p /app/data /app/logs
 
 # Устанавливаем переменные окружения
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/app/src
 ENV PYTHONUNBUFFERED=1
 
 # Открываем порт для веб-хуков
