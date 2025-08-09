@@ -12,10 +12,9 @@ from aiogram.enums import ParseMode
 from shop_bot.bot import handlers
 from shop_bot.bot import admin_handlers
 from shop_bot.webhook_server.app import create_webhook_app
-from shop_bot.data_manager.scheduler import SubscriptionScheduler
+from shop_bot.data_manager.scheduler import start_subscription_monitor
 from shop_bot.utils.logger import logger
 from shop_bot.config import PLANS
-from shop_bot.data_manager.scheduler import start_subscription_monitor
 from shop_bot.data_manager import database
 from shop_bot.utils.logger import bot_logger
 
