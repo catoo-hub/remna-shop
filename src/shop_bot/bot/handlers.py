@@ -481,12 +481,12 @@ async def trial_period_handler(callback: types.CallbackQuery):
     await callback.message.edit_text("Отлично! Создаю для вас бесплатный ключ на 3 дня...")
     try:
         key_number = get_next_key_number(user_id)
-        email = f"user{user_id}-key{key_number}-trial@kitsura_bot"
+        email = f"user{user_id}-key{key_number}-trial@kitsura.fun"
         uri, expire_iso, vless_uuid = await remnawave_api.provision_key(email, days=3, telegram_id=str(user_id))
         if not uri or not expire_iso or not vless_uuid:
             # Сбрасываем флаг при ошибке создания ключа
             reset_trial_used(user_id)
-            await callback.message.edit_text("❌ Не удалось создать пробный ключ в панели Remnawave.")
+            await callback.message.edit_text("❌ Не удалось создать пробный ключ.")
             return
         # convert ISO to timestamp ms for storage
         expiry_dt = datetime.fromisoformat(expire_iso.replace('Z', '+00:00'))
@@ -1177,7 +1177,7 @@ async def process_successful_payment(bot: Bot, metadata: dict):
         key_number = 0
         if action == "new":
             key_number = get_next_key_number(user_id)
-            email = f"user{user_id}-key{key_number}@kitsura_bot"
+            email = f"user{user_id}-key{key_number}@kitsura.fun"
         elif action == "extend":
             key_data = get_key_by_id(key_id)
             if not key_data or key_data['user_id'] != user_id:
@@ -1213,7 +1213,7 @@ async def process_successful_payment(bot: Bot, metadata: dict):
             telegram_id=str(user_id)
         )
         if not uri or not expire_iso or not vless_uuid:
-            await processing_message.edit_text("❌ Не удалось создать/обновить ключ в Remnawave.")
+            await processing_message.edit_text("❌ Не удалось создать/обновить ключ.")
             return
         expiry_dt = datetime.fromisoformat(expire_iso.replace('Z', '+00:00'))
         expiry_ms = int(expiry_dt.timestamp() * 1000)
